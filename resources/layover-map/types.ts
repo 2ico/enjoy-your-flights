@@ -3,7 +3,7 @@ import { z } from "zod";
 const citySchema = z.object({
   code: z.string(),
   name: z.string(),
-  coordinates: z.tuple([z.number(), z.number()]),
+  coordinates: z.array(z.number()),
   tourismScore: z.number(),
   country: z.string(),
 });

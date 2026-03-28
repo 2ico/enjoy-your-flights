@@ -90,7 +90,7 @@ const layoverOptionSchema = z.object({
 const citySchema = z.object({
   code: z.string().describe("IATA airport code"),
   name: z.string().describe("City name"),
-  coordinates: z.tuple([z.number(), z.number()]).describe("[longitude, latitude]"),
+  coordinates: z.array(z.number()).describe("[longitude, latitude] — exactly 2 numbers"),
   tourismScore: z.number().describe("Tourism appeal 1-10"),
   country: z.string().describe("ISO country code"),
 });

@@ -1,7 +1,7 @@
 export interface CityInfo {
   code: string;
   name: string;
-  coordinates: [number, number]; // [lng, lat]
+  coordinates: number[]; // [lng, lat]
   tourismScore: number; // 1-10
   country: string;
 }

@@ -234,11 +234,11 @@ function createLayoverMarker(
 }
 
 function generateArc(
-  start: [number, number],
-  end: [number, number],
+  start: number[],
+  end: number[],
   numPoints: number = 50
-): [number, number][] {
-  const points: [number, number][] = [];
+): number[][] {
+  const points: number[][] = [];
   for (let i = 0; i <= numPoints; i++) {
     const t = i / numPoints;
     const lng = start[0] + (end[0] - start[0]) * t;
