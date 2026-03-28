@@ -1,0 +1,39 @@
+create a spec document for a chat gpt app that allows to plan 1,2,3+ days stops during flight layovers to make trips both cheap and fun.
+
+we want to use typescript in the repo.
+
+our data source is the skiplagged.com mcp https://skiplagged.github.io/mcp/
+
+we need to use the manufact app sdk https://github.com/mcp-use/mcp-use
+
+we will use mapbox for the ui of the app. showing max 3 cities for each layover. Here you can find documentation of mapbox: https://docs.mapbox.com/
+
+
+the user will ask to go from point A eg milan to point B eg San Francisco. the api will return flights with layovers that are the cheapest.
+however the skiplagged api tries to make the total time as short as possible, but we want to check whether A -> C -> B
+can be done at two separate times, with 1 to 5 nights in C for tourism.
+this can also be more complicated and have 2 or 3 layovers, some short and some for 1-5 days for torurism.
+
+
+pseudo-prompt for the research agent:
+<prompt>
+the way you can check for good "tourism" options is by doing a first search from A->B, then find the best layovers by price and by how cool the place is to visit. call these L_i.
+then search flights from A->L_i and L_i->B trying to move dates a few days (at least 7, depending on the number of layovers) back and forth. then show the cheapest options where the flight A->L_i is 0 to 5 days before the flight L_i->B
+so the user can visit L_i for some days, saving money and having a good time.
+try to provide multiple "tourist" layover durations for each L_i city (add this to prompt). for instance, stay for 1 day, 4 days and 5 days in New York.
+</prompt>
+
+UI
+the ui is a fullscreen mapbox map (projection: globe) that shows the best 3 layover cities. 
+there is also a left sidebar that appears as a modal with outer gaps, in the left 45% of the view.
+when a layover city is selected, the different layover durations and options are shown in the left sidebar, for instance 
+title: "3 days in Rome", "5 days in Rome", etc...
+flights: 1. Monday 23 May ITA Airways XY123 HH:MM -> HH:MM,  2. Friday 28 May Lufthansa XY123 HH:MM -> HH:MM
+stay: 3 nights in rome
+price: flights price + estimated total price (with accommodation)
+link(s) to book each flight
+
+each option (for a flight that has a layover in that city) is a separate entry in the left sidebar, with a separator line.
+
+on the map, each layover city L_i has a small indicator with the durations of the options going though it. example: "12h, 1d, 3d" above Rome if there will be those three options shown in the left sidebar when clicking on Rome.
+
