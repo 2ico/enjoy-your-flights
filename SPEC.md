@@ -21,47 +21,36 @@ Hackathon project (Turin, 2026-03-28). **"Enjoy Your Flights"** is a web app tha
 
 ## Architecture Overview
 
-**MCP App scaffolded with `create-mcp-use-app`.** The app is built as an MCP application with built-in hooks for both **ChatGPT** and **Claude**, allowing it to be used as a conversational flight planning assistant within either platform. The `mcp-use` framework provides the MCP server infrastructure, React hooks for tool integration, and widget support.
-
-The app connects to the **Skiplagged MCP** as a data source for flight/hotel searches, and exposes its own tools and UI widgets to ChatGPT/Claude clients.
+**MCP App scaffolded with `create-mcp-use-app`.** Built-in hooks for **ChatGPT** and **Claude**. Uses `server.proxy()` to transparently proxy all Skiplagged MCP tools, giving the LLM full access to flight/hotel data. Our server adds a `show-layover-map` visualization tool.
 
 ```
 ChatGPT / Claude (MCP Clients)
   |
-  +-- Enjoy Your Flights MCP App (mcp-use server + React UI)
+  +-- Enjoy Your Flights MCP Server (mcp-use)
         |
-        +-- Tools: plan_layover_trip, search_flights, etc.
-        +-- Widgets: Mapbox globe map + sidebar UI
+        +-- Proxied Skiplagged tools (11 tools, full LLM access):
+        |     sk_flights_search, sk_flex_departure_calendar,
+        |     sk_flex_return_calendar, sk_destinations_anywhere,
+        |     sk_hotels_search, sk_hotel_details, sk_cars_search,
+        |     sk_resolve_iata, sk_resolve_location, sk_faq_search
         |
-        +-- Skiplagged MCP (upstream data source)
-              +-- sk_flights_search
-              +-- sk_flex_departure_calendar
-              +-- sk_hotels_search
+        +-- Our tool: show-layover-map (renders Mapbox globe widget)
 ```
+
+**Key design decision**: No blackbox algorithm. The LLM (ChatGPT/Claude) has direct access to all Skiplagged search tools and reasons about the best layover strategy itself. Our server is a thin proxy + visualization layer.
 
 ---
 
-## Core Algorithm (Search Orchestrator)
+## LLM Workflow (prompted in server description)
 
-### Phase 1: Discover Layovers
-1. Call `sk_flights_search(A, B, date)` to get connecting flights
-2. Extract layover cities from itineraries
-3. Rank by: frequency as layover, tourism appeal (hardcoded scores), price
-4. Select top 3 cities (L_1, L_2, L_3)
+The server description instructs the LLM to follow this workflow:
 
-### Phase 2: Search Segments with Date Flexibility
-For each L_i, fire parallel searches:
-- `sk_flex_departure_calendar(A, L_i, date)` -- prices across date window
-- `sk_flex_departure_calendar(L_i, B, date)` -- prices across date window
-- `sk_flights_search(A, L_i, cheapest_date)` and `sk_flights_search(L_i, B, cheapest_date)` for flight details
-
-Date window: A->L_i searches `[date-3, date+7]`, L_i->B searches `[date, date+12]`.
-
-### Phase 3: Combine & Filter
-For each L_i, find valid (legA, legB) pairs where legA arrives 0-5 days before legB departs. Group by stay duration ("12h", "1 day", "2 days", ..., "5 days"). Pick cheapest per duration bucket.
-
-### Phase 4: Accommodation Estimates
-For options with stay >= 1 night, call `sk_hotels_search(L_i, checkin, checkout)` for median hotel price. Lazy-loaded when user selects a city.
+1. Use `sk_flights_search` to find routes A→B with layovers
+2. Identify interesting layover cities (considering tourism appeal)
+3. For each layover city L, search `sk_flex_departure_calendar` for A→L and L→B with date flexibility
+4. Find combinations where A→L arrives 0-5 days before L→B departs
+5. Use `sk_hotels_search` to estimate accommodation costs
+6. Call `show-layover-map` to display results on the interactive globe
 
 ---
 
@@ -234,12 +223,13 @@ enjoy-your-flights/
 
 | File | Purpose |
 |------|---------|
-| `src/services/searchOrchestrator.ts` | Core search algorithm -- most complex logic |
-| `src/hooks/useSkiplagged.ts` | MCP connection + typed tool wrappers |
-| `src/components/Map.tsx` | Mapbox globe with markers and arcs |
-| `src/types/flights.ts` | Shared data model interfaces |
-| `src/App.tsx` | Root component wiring everything together |
-| `src/utils/cities.ts` | Hardcoded airport database (~100 cities) |
+| `index.ts` | MCP server: proxies Skiplagged tools + defines `show-layover-map` |
+| `resources/layover-map/widget.tsx` | Mapbox globe widget with markers, arcs, sidebar |
+| `resources/layover-map/components/Sidebar.tsx` | Left sidebar: city cards + option details |
+| `resources/layover-map/components/CityCard.tsx` | City overview card |
+| `resources/layover-map/components/OptionCard.tsx` | Individual layover option with flights/prices |
+| `resources/layover-map/types.ts` | Widget prop schemas (Zod) |
+| `src/utils/cities.ts` | Hardcoded airport database (~75 cities with coordinates) |
 
 ---
 
@@ -255,7 +245,6 @@ enjoy-your-flights/
 
 ## Risks & Mitigations
 
-- **Unknown MCP response format**: Log raw responses in Step 4, keep parsing isolated for quick adaptation
-- **CORS issues**: `useMcp` auto-proxy fallback + Vite `server.proxy` as backup
-- **Rate limiting**: Use flex calendar tools (batch date queries) instead of individual flight searches per date
-- **LLM integration**: ChatGPT and Claude act as the conversational interface via MCP hooks; the search orchestrator is deterministic (no separate LLM calls for flight logic)
+- **Skiplagged rate limiting**: `server.proxy()` retries 3x with 5s backoff; server starts without proxied tools if all retries fail
+- **LLM reasoning quality**: Server description includes detailed workflow instructions guiding the LLM through the multi-step search strategy
+- **City coordinates**: `show-layover-map` falls back to a hardcoded database of ~75 airports if the LLM doesn't provide coordinates
