@@ -14,6 +14,11 @@ export const widgetMetadata: WidgetMetadata = {
     invoking: "Searching for layover options...",
     invoked: "Layover options loaded",
     csp: {
+      connectDomains: [
+        "https://api.mapbox.com",
+        "https://events.mapbox.com",
+        "https://*.tiles.mapbox.com",
+      ],
       resourceDomains: [
         "https://api.mapbox.com",
         "https://events.mapbox.com",
@@ -61,6 +66,10 @@ const LayoverMap: React.FC = () => {
 
       mapboxgl.accessToken = props.mapboxToken;
 
+      // Pad the left side so the globe centers in the right 65% (behind the sidebar)
+      const containerWidth = mapContainer.current!.clientWidth;
+      const sidebarWidth = Math.min(Math.max(containerWidth * 0.42, 300), 460);
+
       const map = new mapboxgl.Map({
         container: mapContainer.current!,
         style: "mapbox://styles/mapbox/dark-v11",
@@ -72,6 +81,9 @@ const LayoverMap: React.FC = () => {
         zoom: 2.5,
         attributionControl: false,
       });
+
+      // Set padding so the globe centers in the right 65% (avoids sidebar overlap)
+      map.setPadding({ left: sidebarWidth, top: 0, right: 0, bottom: 0 });
 
       map.addControl(new mapboxgl.NavigationControl(), "top-right");
 
@@ -132,6 +144,7 @@ const LayoverMap: React.FC = () => {
         zoom: 4,
         duration: 1500,
         essential: true,
+        padding: mapRef.current.getContainer() ? { left: Math.min(Math.max(mapRef.current.getContainer().clientWidth * 0.42, 300), 460), top: 0, right: 0, bottom: 0 } : undefined,
       });
     }
   }, [selectedCity, mapLoaded]);
@@ -175,6 +188,8 @@ const LayoverMap: React.FC = () => {
           onBack={() => {
             setSelectedCity(null);
             if (mapRef.current) {
+              const container = mapRef.current.getContainer();
+              const sidebarPad = container ? Math.min(Math.max(container.clientWidth * 0.42, 300), 460) : 0;
               mapRef.current.flyTo({
                 center: [
                   (props.origin.coordinates[0] + props.destination.coordinates[0]) / 2,
@@ -182,6 +197,7 @@ const LayoverMap: React.FC = () => {
                 ],
                 zoom: 2.5,
                 duration: 1200,
+                padding: { left: sidebarPad, top: 0, right: 0, bottom: 0 },
               });
             }
           }}
